@@ -76,6 +76,6 @@ na GPU jednotky sekund.
 
 ## Autor
 
-Michael Klimeš · [LinkedIn](https://www.linkedin.com/in/michael-klimes) · postaveno s pomocí AI (Claude) jako ukázka práce.
+Michael Klimeš · [LinkedIn](https://www.linkedin.com/in/michael-klimes) 
 
 Data: Registr smluv (smlouvy.gov.cz), ARES. Kód pod licencí MIT.
