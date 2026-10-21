@@ -1,0 +1,923 @@
+<title>Skener nájemních smluv</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: pracovni nastroj realitniho poradce - souhrn nahore, pod nim filtry (stav, mapa obvodu) vlevo a seznam najmu vpravo;
+   detail najmu jako panel u praveho okraje; pak kalendar prilezitosti, cena za m2, dotazy, metoda. */
+:root {
+  --bg: #F3F5F8; --surface: #FFFFFF; --sunken: #EAEEF3; --ink: #13203A; --muted: #586579; --line: #D5DCE5;
+  --accent: #1F4F8F; --accent-ink: #FFFFFF; --signal: #A86508; --signal-bg: #FBEFD9;
+  --good: #23704F; --good-bg: #E1F1E8; --info: #2A5E9E; --info-bg: #E2ECF8; --grey: #6F7A8A; --grey-bg: #ECEFF3;
+  --bad: #A23B2C; --bad-bg: #F8E4E0; --shade: rgba(19, 32, 58, .38);
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0D1522; --surface: #142033; --sunken: #0F1A2A; --ink: #E5ECF5; --muted: #9AA8BA; --line: #26354B;
+  --accent: #7FB0EE; --accent-ink: #0D1522; --signal: #E9A84B; --signal-bg: #3A2A12;
+  --good: #6CC79A; --good-bg: #13301F; --info: #8DB8EE; --info-bg: #182C47; --grey: #8F9BAC; --grey-bg: #1B2638;
+  --bad: #EE8A7A; --bad-bg: #3A1C18; --shade: rgba(0, 0, 0, .55); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0D1522; --surface: #142033; --sunken: #0F1A2A; --ink: #E5ECF5; --muted: #9AA8BA; --line: #26354B;
+  --accent: #7FB0EE; --accent-ink: #0D1522; --signal: #E9A84B; --signal-bg: #3A2A12;
+  --good: #6CC79A; --good-bg: #13301F; --info: #8DB8EE; --info-bg: #182C47; --grey: #8F9BAC; --grey-bg: #1B2638;
+  --bad: #EE8A7A; --bad-bg: #3A1C18; --shade: rgba(0, 0, 0, .55); color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px;
+  display: flex; flex-direction: column; gap: 44px; }
+h1, h2, h3 { font-family: var(--f-display); font-stretch: 112%; text-wrap: balance; margin: 0; line-height: 1.12 }
+h1 { font-size: clamp(2.1rem, 5vw, 3.2rem); font-weight: 800; letter-spacing: -0.01em }
+h2 { font-size: 1.45rem; font-weight: 750 }
+h3 { font-size: 1.05rem; font-weight: 700 }
+p { margin: 0 }
+a { color: var(--accent); text-underline-offset: 2px }
+button { font: inherit; color: inherit }
+:focus-visible { outline: 2px dashed var(--accent); outline-offset: 2px }
+.eyebrow { font: 600 0.74rem/1.2 var(--f-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted) }
+.num { font-variant-numeric: tabular-nums }
+.muted { color: var(--muted) }
+
+/* hlavicka */
+header { display: grid; gap: 14px }
+header .lead { font-size: 1.15rem; max-width: 60ch }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--r); overflow: hidden }
+.kpi { background: var(--surface); padding: 14px 16px; display: grid; gap: 4px; text-align: left; border: 0; cursor: pointer; align-content: start }
+.kpi:hover { background: var(--sunken) }
+.kpi[aria-pressed="true"] { background: var(--sunken); box-shadow: inset 0 -3px 0 var(--accent) }
+.kpi .v { font: 750 1.9rem/1 var(--f-display); font-stretch: 105%; font-variant-numeric: tabular-nums }
+.kpi .l { color: var(--muted); font-size: 0.84rem }
+.kpi.sig .v { color: var(--signal) }
+.kpi .kh { color: var(--muted); font-size: 0.74rem; line-height: 1.35; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: 2px }
+@media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.start { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; font-size: 0.92rem }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; text-align: left;
+  text-decoration: underline; text-underline-offset: 2px }
+
+section { display: grid; gap: 16px; min-width: 0 }
+.sec-head { display: grid; gap: 6px; max-width: 74ch }
+.sec-head p { color: var(--muted) }
+
+/* hledani */
+.search { position: relative; max-width: 640px }
+.search input { width: 100%; font: 1rem var(--f-body); padding: 12px 14px 12px 40px; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink) }
+.search input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent) }
+.search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; stroke: var(--muted); fill: none }
+.sugg { position: absolute; z-index: 15; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); box-shadow: 0 10px 30px var(--shade); max-height: 360px; overflow: auto; padding: 6px 0 }
+.sugg .g { font: 600 0.7rem/1 var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 10px 14px 4px }
+.sugg [role="option"] { display: flex; justify-content: space-between; gap: 12px; padding: 7px 14px; cursor: pointer; font-size: 0.92rem }
+.sugg [role="option"][aria-selected="true"], .sugg [role="option"]:hover { background: var(--sunken) }
+.sugg .c { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap }
+
+.activebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 34px; font-size: 0.9rem }
+.activebar .count b { font-variant-numeric: tabular-nums }
+.fchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--info-bg);
+  color: var(--info); font: 600 0.82rem/1.3 var(--f-body); border: 0 }
+.fchip button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 4px; font-size: 1rem; line-height: 1 }
+
+/* hlavni plocha */
+.work { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 20px; align-items: start }
+@media (max-width: 980px) { .work { grid-template-columns: minmax(0, 1fr) } }
+.side { display: grid; gap: 14px; min-width: 0 }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; min-width: 0 }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { font: 600 0.82rem/1 var(--f-body); padding: 8px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; gap: 6px; align-items: center }
+.chip:hover:not(:disabled) { border-color: var(--muted) }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.chip:disabled { opacity: .45; cursor: default }
+.chip .n { font-variant-numeric: tabular-nums; opacity: .85 }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; background: var(--c) }
+.s-konci_24m { --c: var(--signal); --cb: var(--signal-bg) }
+.s-neurcita { --c: var(--info); --cb: var(--info-bg) }
+.s-pozdeji { --c: var(--good); --cb: var(--good-bg) }
+.s-k_overeni { --c: var(--bad); --cb: var(--bad-bg) }
+.s-skoncilo { --c: var(--grey); --cb: var(--grey-bg) }
+.s-nezname { --c: var(--grey); --cb: var(--grey-bg) }
+.s-nezname .dot, .dot.s-nezname { background: transparent; border: 1.5px solid var(--c) }
+.toggle { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent) }
+
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.78rem; color: var(--muted) }
+.legend span { display: inline-flex; gap: 5px; align-items: center }
+.carto { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px }
+.tile { aspect-ratio: 1; max-width: 100%; min-width: 0; border-radius: 4px; border: 1px solid var(--line); background: var(--sunken);
+  display: grid; grid-template-rows: auto 1fr auto; padding: 4px 4px 3px; cursor: pointer; font: 600 0.66rem/1 var(--f-body);
+  color: var(--muted); text-align: left }
+.tile .cnt { font: 750 1.05rem/1 var(--f-display); color: var(--ink); align-self: center; font-variant-numeric: tabular-nums }
+.tile.has { background: var(--surface) }
+.tile:disabled { cursor: default }
+.tile:disabled .cnt { color: var(--muted); opacity: .5 }
+.tile:hover:not(:disabled) { border-color: var(--muted) }
+.tile[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
+.tile[aria-pressed="true"] .cnt { color: var(--accent-ink) }
+.bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--line) }
+.bar i { display: block; height: 100%; background: var(--c) }
+.bar i.s-nezname { background: repeating-linear-gradient(90deg, var(--c) 0 2px, transparent 2px 4px) }
+.mesta { display: flex; flex-wrap: wrap; gap: 6px }
+.hint { font-size: 0.8rem; color: var(--muted) }
+
+/* tabulka */
+.listhead { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between }
+.btn { display: inline-flex; align-items: center; gap: 6px; font: 600 0.85rem/1 var(--f-body); padding: 9px 12px; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer }
+.btn:hover { border-color: var(--muted) }
+.tablewrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; overflow: hidden }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; table-layout: fixed }
+th { text-align: left; font: 600 0.7rem/1.2 var(--f-body); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted);
+  padding: 0; border-bottom: 1px solid var(--line); background: var(--surface) }
+th button { all: unset; display: flex; gap: 4px; align-items: center; padding: 10px 10px; cursor: pointer; width: 100%; box-sizing: border-box }
+th button:focus-visible { outline: 2px dashed var(--accent); outline-offset: -2px }
+th .ar { opacity: .4 }
+th[aria-sort] .ar { opacity: 1; color: var(--accent) }
+td { padding: 10px 10px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere }
+td.r { text-align: right; font-variant-numeric: tabular-nums }
+th.r button { justify-content: flex-end }
+tr.row { cursor: pointer }
+tr.row:hover td { background: var(--sunken) }
+tr.row[aria-selected="true"] td { background: var(--info-bg) }
+tr.row:focus-visible { outline: 2px dashed var(--accent); outline-offset: -2px }
+.who { font-weight: 600 }
+.sub { color: var(--muted); font-size: 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400 }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: var(--cb);
+  color: var(--c); font: 600 0.74rem/1.3 var(--f-body) }
+.ok { color: var(--good); font-weight: 700 }
+.warn { color: var(--signal); font-weight: 700 }
+.svc { font-weight: 600 }
+.svc.monitoring, .svc.overit { font-weight: 400; color: var(--muted) }
+.chev { color: var(--muted); text-align: right }
+.empty { padding: 28px; color: var(--muted); text-align: center }
+col.c-who { width: 30% } col.c-lok { width: 13% } col.c-stav { width: 14% } col.c-date { width: 15% } col.c-kc { width: 9% }
+col.c-svc { width: 15% } col.c-chev { width: 4% }
+.date2 { font-size: 0.78rem; color: var(--muted) }
+@media (max-width: 760px) {
+  table, tbody { display: block } thead, colgroup { display: none }
+  tr.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 12px; padding: 12px; border-bottom: 1px solid var(--line) }
+  tr.row td { border: 0; padding: 0; background: none !important }
+  tr.row td.who { grid-column: 1 / -1 }
+  tr.row td[data-l]::before { content: attr(data-l); display: block; color: var(--muted); font-weight: 400; font-size: 0.72rem; letter-spacing: .06em; text-transform: uppercase }
+  tr.row td.r { text-align: left }
+  tr.row td.chev { display: none }
+  tr.row[aria-selected="true"] { background: var(--info-bg) }
+}
+
+/* detail - panel */
+.shade { position: fixed; inset: 0; background: var(--shade); z-index: 30 }
+.drawer { position: fixed; z-index: 31; top: 0; right: 0; bottom: 0; width: min(580px, 100%); background: var(--bg);
+  border-left: 1px solid var(--line); box-shadow: -12px 0 40px var(--shade); overflow-y: auto; overscroll-behavior: contain;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px)) calc(28px + env(safe-area-inset-bottom, 0px)) 18px;
+  display: grid; gap: 16px; align-content: start }
+@media (max-width: 600px) { .drawer { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-left: 0 } }
+.dtop { display: flex; justify-content: space-between; gap: 12px; align-items: start }
+.close { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); width: 38px; height: 38px; cursor: pointer; font-size: 1.1rem; flex: none }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+.tag { font: 700 0.68rem/1 var(--f-body); letter-spacing: .08em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px;
+  background: var(--sunken); color: var(--muted); border: 1px solid var(--line) }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; min-width: 0 }
+.box.today { border-top: 3px solid var(--accent) }
+.box h3 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap }
+.crit { display: grid; gap: 2px; padding: 12px 14px; border-radius: var(--r); background: var(--signal-bg); color: var(--ink) }
+.crit b { font: 750 1.25rem/1.2 var(--f-display); color: var(--signal) }
+.crit.calm { background: var(--sunken) }
+.crit.calm b { color: var(--ink) }
+.f { display: grid; grid-template-columns: 10.5em minmax(0, 1fr); gap: 2px 12px; align-items: baseline; padding-top: 10px; border-top: 1px solid var(--line) }
+.box h3 + .f { border-top: 0; padding-top: 0 }
+@media (max-width: 460px) { .f { grid-template-columns: minmax(0, 1fr) } }
+.f .k { color: var(--muted); font-size: 0.85rem }
+.f .val { font-weight: 600; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline }
+.f .val.none { font-weight: 400; color: var(--muted) }
+.f .meta { grid-column: 2; font-size: 0.8rem; color: var(--muted); display: grid; gap: 4px }
+@media (max-width: 460px) { .f .meta { grid-column: 1 } }
+.badge { font: 600 0.72rem/1.2 var(--f-body); padding: 2px 7px; border-radius: 999px; white-space: nowrap }
+.badge.ok { background: var(--good-bg); color: var(--good) }
+.badge.warn { background: var(--signal-bg); color: var(--signal) }
+details summary { cursor: pointer; color: var(--accent); font-weight: 600; width: fit-content }
+blockquote { margin: 6px 0 0; padding: 8px 10px; border-left: 2px solid var(--line); background: var(--sunken);
+  font: 0.78rem/1.5 var(--f-mono); color: var(--ink); overflow-wrap: anywhere }
+.tl { list-style: none; margin: 0; padding: 0; display: grid }
+.tl > li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; position: relative; padding-bottom: 14px }
+.tl > li::before { content: ""; position: absolute; left: 6px; top: 16px; bottom: 0; width: 2px; background: var(--line) }
+.tl > li:last-child::before { display: none }
+.tl .node { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); background: var(--surface); margin-top: 3px }
+.tl > li.cur .node { background: var(--accent) }
+.tl .h { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 0.88rem }
+.tl .body { display: grid; gap: 4px; min-width: 0 }
+.tl .ch { font-size: 0.84rem; margin: 0; padding-left: 18px }
+.links { display: grid; gap: 12px }
+.links .who2 { font-weight: 600 }
+.row2 { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.86rem; align-items: baseline }
+.svcbox b { font: 750 1.15rem/1.2 var(--f-display) }
+
+/* kalendar */
+.calwrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r) }
+.cal { display: grid; grid-template-columns: repeat(12, minmax(140px, 1fr)); min-width: 1680px }
+.qcol { border-right: 1px solid var(--line); padding: 10px 8px; display: grid; gap: 6px; align-content: start; min-height: 150px }
+.qcol:last-child { border-right: 0 }
+.qcol h3 { font-size: 0.86rem; display: flex; justify-content: space-between; gap: 6px }
+.qcol h3 span { color: var(--muted); font-weight: 600 }
+.qcol.now { background: var(--sunken) }
+.ev { all: unset; display: grid; gap: 2px; padding: 6px 8px; border-radius: 4px; background: var(--cb); cursor: pointer; font-size: 0.78rem;
+  border-left: 3px solid var(--c); box-sizing: border-box }
+.ev:focus-visible { outline: 2px dashed var(--accent) }
+.ev b { font-weight: 600; color: var(--ink); overflow-wrap: anywhere }
+.ev span { color: var(--muted) }
+.calnote { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; font-size: 0.9rem }
+
+/* benchmark */
+.bench svg { width: 100%; height: auto; display: block }
+.bench text { fill: var(--muted); font: 12px var(--f-body) }
+.bench .lbl { fill: var(--ink); font-weight: 600 }
+.bench .gl { stroke: var(--line); stroke-width: 1 }
+.bench .pt { fill: var(--accent); stroke: var(--surface); stroke-width: 2; cursor: pointer }
+.bench .pt:hover, .bench .pt:focus { fill: var(--signal); outline: none }
+.bench .med { stroke: var(--ink); stroke-width: 2 }
+.benchwrap { overflow-x: auto }
+.benchwrap svg { min-width: 560px }
+.tip { position: fixed; z-index: 40; pointer-events: none; background: var(--ink); color: var(--bg); padding: 8px 10px;
+  border-radius: 6px; font-size: 0.8rem; max-width: 280px; line-height: 1.35 }
+
+/* dotazy */
+.ask { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 20px; align-items: start }
+@media (max-width: 860px) { .ask { grid-template-columns: minmax(0, 1fr) } }
+.qs { display: grid; gap: 8px }
+.qbtn { text-align: left; padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600 }
+.qbtn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent) }
+.ans ol { margin: 0; padding-left: 1.3em; display: grid; gap: 8px }
+
+/* metoda */
+.flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px }
+@media (max-width: 860px) { .flow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) } }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: grid; gap: 4px; align-content: start }
+.step .v { font: 750 1.4rem/1 var(--f-display); font-variant-numeric: tabular-nums }
+.step .l { font-size: 0.82rem; color: var(--muted) }
+.notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 28px; max-width: 1000px }
+@media (max-width: 760px) { .notes { grid-template-columns: minmax(0, 1fr) } }
+.notes div { display: grid; gap: 4px }
+.notes p { color: var(--muted); font-size: 0.92rem }
+footer { color: var(--muted); font-size: 0.84rem; border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-wrap: wrap; gap: 8px 20px }
+.toast { position: fixed; z-index: 50; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: var(--r); font-size: 0.9rem; max-width: calc(100% - 32px) }
+.copybox { display: grid; gap: 8px }
+.copybox textarea { width: 100%; height: 160px; font: 0.75rem var(--f-mono); background: var(--sunken); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r) }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+@media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out } @keyframes slide { from { transform: translateX(24px); opacity: .6 } } }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow" id="stamp">Registr smluv</span>
+    <h1>Skener nájemních smluv</h1>
+    <p class="lead">Komu končí nájem kanceláří, kolik platí za m² a kdy může vypovědět.</p>
+    <div class="kpis" id="kpis"></div>
+    <p class="start" id="start"></p>
+  </header>
+
+  <section id="najmy" aria-labelledby="h-najmy">
+    <div class="sec-head">
+      <h2 id="h-najmy">Nájmy</h2>
+      <p>Kanceláře, které si pronajímají úřady a státní organizace. Každý řádek je jeden nájem: původní smlouva i všechny její dodatky. Klepnutím otevřete detail.</p>
+    </div>
+    <div class="search" id="searchbox">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke-width="2"></circle><path d="M15.5 15.5 21 21" stroke-width="2" stroke-linecap="round"></path></svg>
+      <label class="vh" for="q">Hledat nájemce, pronajímatele, lokalitu nebo IČO</label>
+      <input id="q" type="search" autocomplete="off" placeholder="Hledat: úřad, pronajímatel, Praha 8, IČO…" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="sugg">
+      <div class="sugg" id="sugg" role="listbox" aria-label="Návrhy" hidden></div>
+    </div>
+    <div class="activebar" id="activebar" aria-live="polite"></div>
+    <div class="work">
+      <div class="side">
+        <div class="panel">
+          <h3>Stav nájmu</h3>
+          <div class="chips" id="stavy"></div>
+          <label class="toggle"><input type="checkbox" id="jenprilez"> Jen příležitosti pro poradce</label>
+          <p class="hint">Příležitost = nájem, kde dává smysl nabídnout relokaci, přejednání, zmenšení nebo rozšíření prostor.</p>
+        </div>
+        <div class="panel">
+          <h3>Praha podle obvodů</h3>
+          <div class="legend" id="legend"></div>
+          <div class="carto" id="carto"></div>
+          <p class="hint">Číslo = počet nájmů v obvodu, pruh = jejich stavy. Klepnutím obvod vyberete, dalším klepnutím zrušíte.</p>
+          <h3>Mimo Prahu</h3>
+          <div class="mesta" id="mesta"></div>
+        </div>
+        <div class="panel">
+          <h3>Doporučená služba</h3>
+          <div class="chips" id="sluzby"></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="listhead">
+          <p class="muted" id="sortinfo"></p>
+          <div class="chips">
+            <button class="btn" id="copy" type="button">Kopírovat do Excelu</button>
+            <button class="btn" id="csv" type="button" hidden>Stáhnout CSV</button>
+          </div>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <colgroup><col class="c-who"><col class="c-lok"><col class="c-stav"><col class="c-date"><col class="c-kc"><col class="c-svc"><col class="c-chev"></colgroup>
+            <thead><tr id="thead"></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="kalendar" aria-labelledby="h-kal">
+    <div class="sec-head">
+      <h2 id="h-kal">Kalendář příležitostí</h2>
+      <p>Kritická data na příštích 36 měsíců po čtvrtletích. Kritické datum je poslední den, kdy nájemce ještě stihne vypovědět nebo uplatnit prodloužení. Tehdy se rozhoduje, jestli zůstane, nebo se stěhuje. Kalendář se řídí filtry výše.</p>
+    </div>
+    <div class="calnote" id="calnote"></div>
+    <div class="calwrap"><div class="cal" id="cal"></div></div>
+  </section>
+
+  <section id="cena" aria-labelledby="h-cena">
+    <div class="sec-head">
+      <h2 id="h-cena">Kolik se platí za m²</h2>
+      <p id="cena-p">Nájemné bez služeb a DPH v Kč za m² měsíčně.</p>
+    </div>
+    <div class="panel bench" id="bench"></div>
+  </section>
+
+  <section id="dotazy" aria-labelledby="h-dotazy">
+    <div class="sec-head">
+      <h2 id="h-dotazy">Zeptejte se dat</h2>
+    </div>
+    <div class="ask">
+      <div class="qs" id="qs"></div>
+      <div class="panel ans" id="ans" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="metoda" aria-labelledby="h-metoda">
+    <div class="sec-head">
+      <h2 id="h-metoda">Jak data vznikla</h2>
+      <p>Vše pochází z otevřených dat Registru smluv. Zpracování běží na obyčejném notebooku, bez cloudu a bez placených služeb.</p>
+    </div>
+    <div class="flow" id="flow"></div>
+    <div class="notes" id="notes"></div>
+  </section>
+
+  <footer>
+    <span>Připravil Michael Klimeš jako ukázku práce.</span>
+    <a href="https://github.com/Tataboj/skener-najemnich-smluv" target="_blank" rel="noopener">Zdrojový kód na GitHubu ↗</a>
+    <span id="foot"></span>
+  </footer>
+</div>
+
+<div class="shade" id="shade" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title" hidden></aside>
+<div class="tip" id="tip" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const DATA = __DATA__;
+(() => {
+  "use strict";
+  const N = DATA.najmy, M = DATA.meta;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fold = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const nf = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 0 });
+  const nf1 = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 1 });
+  const cz = (iso) => { if (!iso) return ""; const [y, m, d] = iso.slice(0, 10).split("-"); return `${+d}. ${+m}. ${y}`; };
+  const DNES = M.dnes;
+  const mesicu = (iso) => { const [y, m, d] = iso.split("-").map(Number); const [a, b, c] = DNES.split("-").map(Number); return (y - a) * 12 + (m - b) - (d < c ? 1 : 0); };
+  const plural = (n, a, b, c) => (n === 1 ? a : n >= 2 && n <= 4 ? b : c);
+  const najmu = (n) => `${n} ${plural(n, "nájem", "nájmy", "nájmů")}`;
+
+  const STAV = { konci_24m: "Končí do 24 měsíců", neurcita: "Doba neurčitá", pozdeji: "Končí později",
+    k_overeni: "Konec k ověření", skoncilo: "Skončilo", nezname: "Konec neuveden" };
+  const STAV_ORDER = ["konci_24m", "neurcita", "pozdeji", "k_overeni", "skoncilo", "nezname"];
+  const SLUZBA_ORDER = ["relokace", "prejednani", "kontrakce", "expanze", "overit", "monitoring"];
+  const SLUZBA = { relokace: "Relokace / přejednání", prejednani: "Přejednání podmínek", kontrakce: "Optimalizace (zmenšení)",
+    expanze: "Expanze", overit: "Ověřit pokračování nájmu", monitoring: "Sledovat" };
+  const PRILEZ = new Set(["relokace", "prejednani", "kontrakce", "expanze"]);
+  const isPraha = (l) => /^Praha \d/.test(l || "");
+  const lokOf = (n) => n.lokalita || "Neuvedeno";
+
+  // ---------------------------------------------------------------- stav filtru --
+  const st = { stav: null, sluzba: null, lok: null, najemce: null, pronajimatel: null, text: null, prilez: false,
+    sort: "priorita", dir: 1, open: null };
+  const KEYS = ["stav", "sluzba", "lok", "najemce", "pronajimatel", "text", "prilez"];
+  const prona = (n) => n.pronajimatel.map((p) => p.nazev).join(", ");
+  const hay = N.map((n) => fold([n.najemce, n.najemce_ico, prona(n), n.pronajimatel.map((p) => p.ico).join(" "), lokOf(n), n.adresa, n.predmet].join(" ")));
+  function match(n, i, skip) {
+    if (skip !== "stav" && st.stav && n.stav !== st.stav) return false;
+    if (skip !== "sluzba" && st.sluzba && n.sluzba !== st.sluzba) return false;
+    if (skip !== "lok" && st.lok && lokOf(n) !== st.lok) return false;
+    if (st.prilez && !PRILEZ.has(n.sluzba)) return false;
+    if (st.najemce && n.najemce_ico !== st.najemce.v) return false;
+    if (st.pronajimatel && !n.pronajimatel.some((p) => (p.ico || p.nazev) === st.pronajimatel.v)) return false;
+    if (st.text && !hay[i].includes(fold(st.text))) return false;
+    return true;
+  }
+  const filtered = (skip) => N.filter((n, i) => match(n, i, skip));
+  const anyFilter = () => KEYS.some((k) => st[k]);
+  const only = (k) => KEYS.every((x) => x === k || !st[x]);
+  function resetAll(doRender) { KEYS.forEach((k) => (st[k] = k === "prilez" ? false : null)); if (doRender) render(); }
+  const goList = () => $("najmy").scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // --------------------------------------------------------------- hlavicka --
+  const kritDo24 = (n) => n.sluzba === "relokace";
+  const KPI = [];
+  function header() {
+    $("stamp").textContent = `Data k ${cz(DNES)} · zdroj Registr smluv`;
+    const kc = N.filter((n) => n.kc_m2.ok).map((n) => n.kc_m2.v).sort((a, b) => a - b);
+    const med = kc.length ? kc[Math.floor(kc.length / 2)] : null;
+    KPI.push(
+      { v: N.length, l: "nájmů ve skeneru", act: {}, on: () => !anyFilter() },
+      { v: N.filter(kritDo24).length, l: "kritické datum do 24 měsíců", hint: "Kritické datum = poslední den, kdy nájemce stihne vypovědět nebo uplatnit prodloužení.", sig: true, act: { sluzba: "relokace" }, on: () => st.sluzba === "relokace" && only("sluzba") },
+      { v: N.filter((n) => n.stav === "neurcita").length, l: "na dobu neurčitou, lze vypovědět kdykoli", act: { stav: "neurcita" }, on: () => st.stav === "neurcita" && only("stav") },
+      { v: med ? nf.format(med) + " Kč" : "–", l: `medián za m² měsíčně (${kc.length} ověřených hodnot)`, jump: "cena", on: () => false });
+    $("kpis").innerHTML = KPI.map((x, i) => `<button type="button" class="kpi ${x.sig ? "sig" : ""}" data-kpi="${i}" aria-pressed="false"><span class="v">${x.v}</span><span class="l">${esc(x.l)}</span>${x.hint ? `<span class="kh">${esc(x.hint)}</span>` : ""}</button>`).join("");
+    $("kpis").querySelectorAll(".kpi").forEach((b) => b.addEventListener("click", () => {
+      const a = KPI[+b.dataset.kpi];
+      if (a.jump) { $(a.jump).scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+      resetAll(false); Object.assign(st, a.act); render(); goList();
+    }));
+    const score = (n) => n.uplnost * 2 + Math.min(n.dokumentu, 4) + (n.sluzba === "relokace" ? 3 : 0) + (n.opce.v != null ? 1 : 0) + (n.kc_m2.ok ? 1 : 0);
+    const best = [...N].sort((a, b) => score(b) - score(a))[0];
+    if (best) {
+      $("start").innerHTML = `<span class="muted">Začněte ukázkou:</span> <button class="linkbtn" type="button" id="bestbtn">${esc(best.najemce)} – ${esc(lokOf(best))}</button><span class="muted">${best.dokumentu} ${plural(best.dokumentu, "dokument", "dokumenty", "dokumentů")} · ${SLUZBA[best.sluzba].toLowerCase()}</span>`;
+      $("bestbtn").addEventListener("click", (e) => openDetail(best.id, e.currentTarget));
+    }
+  }
+  const syncKpis = () => $("kpis").querySelectorAll(".kpi").forEach((b, i) => b.setAttribute("aria-pressed", String(!!KPI[i].on())));
+
+  // ------------------------------------------------------------ hledani --
+  const IDX = (() => {
+    const a = {}, b = {}, c = {};
+    N.forEach((n) => {
+      (a[n.najemce_ico] ||= { label: n.najemce, ico: n.najemce_ico, key: n.najemce_ico, c: 0 }).c++;
+      n.pronajimatel.forEach((p) => { const k = p.ico || p.nazev; (b[k] ||= { label: p.nazev, ico: p.ico, key: k, c: 0 }).c++; });
+      (c[lokOf(n)] ||= { label: lokOf(n), key: lokOf(n), c: 0 }).c++;
+    });
+    return [["Nájemci", "najemce", Object.values(a)], ["Pronajímatelé", "pronajimatel", Object.values(b)], ["Lokality", "lok", Object.values(c)]];
+  })();
+  let sugItems = [], sugSel = -1;
+  function suggest() {
+    const raw = $("q").value.trim(), q = fold(raw);
+    if (!q) { closeSug(); return; }
+    const dg = q.replace(/\s/g, ""), isNum = /^\d{2,}$/.test(dg);
+    const qp = fold(raw).replace(/^p(?=\s?\d)/, "praha").replace(/\s/g, "");
+    const hit = (x) => { const f = fold(x.label); return f.includes(q) || f.replace(/\s/g, "").includes(qp) || (isNum && x.ico && x.ico.includes(dg)); };
+    sugItems = []; let html = "";
+    IDX.forEach(([g, kind, list]) => {
+      list.filter(hit).sort((x, y) => y.c - x.c || x.label.localeCompare(y.label, "cs")).slice(0, 6).forEach((it, j) => {
+        if (j === 0) html += `<div class="g" role="presentation">${g}</div>`;
+        const i = sugItems.push({ kind, v: it.key, label: it.label, c: it.c }) - 1;
+        html += `<div role="option" id="opt${i}" data-i="${i}" aria-selected="false"><span>${esc(it.label)}${it.ico ? ` <span class="c">· IČO ${esc(it.ico)}</span>` : ""}</span><span class="c">${najmu(it.c)}</span></div>`;
+      });
+    });
+    const tc = N.filter((n, i) => hay[i].includes(q)).length;
+    const ti = sugItems.push({ kind: "text", v: raw, c: tc }) - 1;
+    html += `<div class="g" role="presentation">Hledat v textu</div><div role="option" id="opt${ti}" data-i="${ti}" aria-selected="false"><span>Všechny nájmy obsahující „${esc(raw)}“</span><span class="c">${najmu(tc)}</span></div>`;
+    $("sugg").innerHTML = html; $("sugg").hidden = false; $("q").setAttribute("aria-expanded", "true"); sugSel = -1;
+    $("sugg").querySelectorAll("[role=option]").forEach((o) => o.addEventListener("mousedown", (e) => { e.preventDefault(); pick(+o.dataset.i); }));
+  }
+  function closeSug() { $("sugg").hidden = true; $("q").setAttribute("aria-expanded", "false"); sugSel = -1; $("q").removeAttribute("aria-activedescendant"); }
+  function pick(i) {
+    const it = sugItems[i]; if (!it) return;
+    if (it.kind === "lok") st.lok = it.v; else if (it.kind === "text") st.text = it.v; else st[it.kind] = { v: it.v, label: it.label };
+    $("q").value = ""; closeSug(); render();
+  }
+  $("q").addEventListener("input", suggest);
+  $("q").addEventListener("focus", () => { if ($("q").value.trim()) suggest(); });
+  $("q").addEventListener("blur", () => setTimeout(closeSug, 150));
+  $("q").addEventListener("keydown", (e) => {
+    const opts = [...$("sugg").querySelectorAll("[role=option]")];
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && opts.length && !$("sugg").hidden) {
+      e.preventDefault();
+      sugSel = (sugSel + (e.key === "ArrowDown" ? 1 : -1) + opts.length) % opts.length;
+      opts.forEach((o, j) => o.setAttribute("aria-selected", String(j === sugSel)));
+      $("q").setAttribute("aria-activedescendant", opts[sugSel].id);
+      opts[sugSel].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (!$("q").value.trim()) return;
+      if ($("sugg").hidden) suggest();
+      pick(sugSel >= 0 ? +opts[sugSel].dataset.i : sugItems.length - 1);
+    } else if (e.key === "Escape") closeSug();
+  });
+
+  // --------------------------------------------------------- lista filtru --
+  function activebar() {
+    const f = filtered(), parts = [];
+    if (st.najemce) parts.push(["najemce", "Nájemce: " + st.najemce.label]);
+    if (st.pronajimatel) parts.push(["pronajimatel", "Pronajímatel: " + st.pronajimatel.label]);
+    if (st.text) parts.push(["text", `Obsahuje „${st.text}“`]);
+    if (st.lok) parts.push(["lok", st.lok]);
+    if (st.stav) parts.push(["stav", STAV[st.stav]]);
+    if (st.sluzba) parts.push(["sluzba", SLUZBA[st.sluzba]]);
+    if (st.prilez) parts.push(["prilez", "Jen příležitosti"]);
+    $("activebar").innerHTML = `<span class="count">Zobrazeno <b id="shown">${f.length}</b> z <b>${N.length}</b> nájmů</span>` +
+      parts.map(([k, l]) => `<span class="fchip">${esc(l)}<button type="button" data-clear="${k}" aria-label="Zrušit filtr ${esc(l)}">✕</button></span>`).join("") +
+      (parts.length ? `<button type="button" class="linkbtn" id="clearall">Zrušit vše</button>` : `<span class="muted">· bez filtrů</span>`);
+    $("activebar").querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", () => { const k = b.dataset.clear; st[k] = k === "prilez" ? false : null; render(); }));
+    if ($("clearall")) $("clearall").addEventListener("click", () => resetAll(true));
+  }
+
+  // ------------------------------------------------------ stavy + sluzby --
+  function chips() {
+    const base = filtered("stav");
+    $("stavy").innerHTML = STAV_ORDER.map((s) => { const c = base.filter((n) => n.stav === s).length;
+      return `<button type="button" class="chip s-${s}" data-stav="${s}" aria-pressed="${st.stav === s}" ${c || st.stav === s ? "" : "disabled"}><span class="dot"></span>${STAV[s]} <span class="n">${c}</span></button>`; }).join("");
+    $("stavy").querySelectorAll("[data-stav]").forEach((b) => b.addEventListener("click", () => { st.stav = st.stav === b.dataset.stav ? null : b.dataset.stav; render(); }));
+    const base2 = filtered("sluzba");
+    $("sluzby").innerHTML = SLUZBA_ORDER.map((s) => { const c = base2.filter((n) => n.sluzba === s).length;
+      return `<button type="button" class="chip" data-sluzba="${s}" aria-pressed="${st.sluzba === s}" ${c || st.sluzba === s ? "" : "disabled"}>${SLUZBA[s]} <span class="n">${c}</span></button>`; }).join("");
+    $("sluzby").querySelectorAll("[data-sluzba]").forEach((b) => b.addEventListener("click", () => { st.sluzba = st.sluzba === b.dataset.sluzba ? null : b.dataset.sluzba; render(); }));
+    $("jenprilez").checked = st.prilez;
+    $("legend").innerHTML = STAV_ORDER.map((s) => `<span class="s-${s}"><span class="dot"></span>${STAV[s]}</span>`).join("");
+  }
+  $("jenprilez").addEventListener("change", (e) => { st.prilez = e.target.checked; render(); });
+
+  // ---------------------------------------------------------- kartogram --
+  const LAYOUT = { 6: [0, 1], 7: [0, 2], 8: [0, 3], 18: [0, 4], 19: [0, 5], 20: [0, 6], 17: [1, 0], 1: [1, 2], 3: [1, 3], 9: [1, 4], 14: [1, 5], 21: [1, 6],
+    13: [2, 0], 5: [2, 1], 2: [2, 2], 10: [2, 3], 15: [2, 4], 22: [2, 5], 16: [3, 1], 4: [3, 2], 11: [3, 3], 12: [4, 2] };
+  const barOf = (list) => `<span class="bar">${list.length ? STAV_ORDER.map((s) => { const c = list.filter((n) => n.stav === s).length; return c ? `<i class="s-${s}" style="width:${(c / list.length) * 100}%"></i>` : ""; }).join("") : ""}</span>`;
+  const stavyTxt = (list) => STAV_ORDER.map((s) => [s, list.filter((n) => n.stav === s).length]).filter((x) => x[1]).map(([s, c]) => `${STAV[s].toLowerCase()} ${c}`).join(", ");
+  function carto() {
+    const base = filtered("lok"), cells = [];
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) {
+      const k = Object.keys(LAYOUT).find((d) => LAYOUT[d][0] === r && LAYOUT[d][1] === c);
+      if (!k) { cells.push(`<span aria-hidden="true"></span>`); continue; }
+      const name = "Praha " + k, list = base.filter((n) => n.lokalita === name), sel = st.lok === name;
+      const tip = list.length ? `${name}: ${najmu(list.length)} (${stavyTxt(list)})` : `${name}: žádný nájem`;
+      cells.push(`<button type="button" class="tile ${list.length ? "has" : ""}" data-lok="${name}" aria-pressed="${sel}" ${list.length || sel ? "" : "disabled"} title="${esc(tip)}" aria-label="${esc(tip)}"><span>P${k}</span><span class="cnt">${list.length || "·"}</span>${barOf(list)}</button>`);
+    }
+    $("carto").innerHTML = cells.join("");
+    const mesta = {};
+    base.forEach((n) => { const l = lokOf(n); if (!isPraha(l)) (mesta[l] ||= []).push(n); });
+    if (st.lok && !isPraha(st.lok) && !mesta[st.lok]) mesta[st.lok] = [];
+    const ord = Object.entries(mesta).sort((a, b) => (a[0] === "Neuvedeno") - (b[0] === "Neuvedeno") || b[1].length - a[1].length || a[0].localeCompare(b[0], "cs"));
+    $("mesta").innerHTML = ord.map(([l, list]) => `<button type="button" class="chip" data-lok="${esc(l)}" aria-pressed="${st.lok === l}" title="${esc(l)}: ${esc(stavyTxt(list))}">${esc(l)} <span class="n">${list.length}</span></button>`).join("") || `<span class="hint">Pro zvolené filtry žádný nájem mimo Prahu.</span>`;
+    document.querySelectorAll("#carto [data-lok], #mesta [data-lok]").forEach((b) => b.addEventListener("click", () => { st.lok = st.lok === b.dataset.lok ? null : b.dataset.lok; render(); }));
+  }
+
+  // ------------------------------------------------------------- tabulka --
+  const COLS = [["najemce", "Nájemce", ""], ["lokalita", "Místo", ""], ["stav", "Stav", ""], ["datum", "Konec / kritické datum", ""], ["kc", "Kč/m²", "r"], ["sluzba", "Doporučená služba", ""]];
+  const datumKey = (n) => n.kriticke || n.konec.v || (n.stav === "neurcita" ? "0000" : "9999");
+  function sortList(list) {
+    const d = st.dir;
+    const cmp = {
+      priorita: (a, b) => SLUZBA_ORDER.indexOf(a.sluzba) - SLUZBA_ORDER.indexOf(b.sluzba) || (datumKey(a) < datumKey(b) ? -1 : datumKey(a) > datumKey(b) ? 1 : 0),
+      najemce: (a, b) => a.najemce.localeCompare(b.najemce, "cs") * d,
+      lokalita: (a, b) => lokOf(a).localeCompare(lokOf(b), "cs", { numeric: true }) * d,
+      stav: (a, b) => (STAV_ORDER.indexOf(a.stav) - STAV_ORDER.indexOf(b.stav)) * d,
+      datum: (a, b) => (datumKey(a) < datumKey(b) ? -1 : datumKey(a) > datumKey(b) ? 1 : 0) * d,
+      kc: (a, b) => ((a.kc_m2.v ?? -1) - (b.kc_m2.v ?? -1)) * d,
+      sluzba: (a, b) => (SLUZBA_ORDER.indexOf(a.sluzba) - SLUZBA_ORDER.indexOf(b.sluzba)) * d,
+    }[st.sort];
+    return [...list].sort((a, b) => cmp(a, b) || a.najemce.localeCompare(b.najemce, "cs") || (a.id < b.id ? -1 : 1));
+  }
+  const mark = (p) => (p.v == null ? "" : p.ok ? ` <span class="ok" title="Ověřeno citací ze smlouvy">✓</span>` : ` <span class="warn" title="Zkontrolovat ve smlouvě">⚠</span>`);
+  function dateCell(n) {
+    if (n.stav === "neurcita") return `kdykoli<div class="date2">${n.lhuta ? `výpověď ${n.lhuta} měs.` : "výpovědní lhůta neuvedena"}</div>`;
+    if (!n.konec.v) return `<span class="muted">neuvedeno</span>`;
+    const k = n.kriticke && n.kriticke !== n.konec.v ? `<div class="date2">kritické ${cz(n.kriticke)}</div>` : "";
+    return `${cz(n.konec.v)}${mark(n.konec)}${k}`;
+  }
+  function thead() {
+    $("thead").innerHTML = COLS.map(([k, l, cls]) => `<th class="${cls}" ${st.sort === k ? `aria-sort="${st.dir > 0 ? "ascending" : "descending"}"` : ""}><button type="button" data-sort="${k}">${l}<span class="ar" aria-hidden="true">${st.sort === k ? (st.dir > 0 ? "▲" : "▼") : "↕"}</span></button></th>`).join("") + `<th><span class="vh">Otevřít</span></th>`;
+    $("thead").querySelectorAll("[data-sort]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.sort; if (st.sort === k) st.dir = -st.dir; else { st.sort = k; st.dir = 1; } render();
+    }));
+    $("sortinfo").innerHTML = st.sort === "priorita" ? "Řazeno podle priority: nejdřív nájmy, kde se brzy rozhoduje." :
+      `Řazeno podle sloupce „${COLS.find((c) => c[0] === st.sort)[1]}“. <button type="button" class="linkbtn" id="sortreset">Řadit podle priority</button>`;
+    if ($("sortreset")) $("sortreset").addEventListener("click", () => { st.sort = "priorita"; st.dir = 1; render(); });
+  }
+  function rows() {
+    const list = sortList(filtered());
+    if (!list.length) {
+      $("rows").innerHTML = `<tr><td colspan="7" class="empty">Žádný nájem neodpovídá filtrům. <button type="button" class="linkbtn" id="clear2">Zrušit vše</button></td></tr>`;
+      $("clear2").addEventListener("click", () => resetAll(true)); return;
+    }
+    $("rows").innerHTML = list.map((n) => `<tr class="row" tabindex="0" data-id="${n.id}" aria-selected="${st.open === n.id}">
+      <td class="who">${esc(n.najemce)}<div class="sub">${esc(prona(n) || "pronajímatel neuveden")} · ${n.dokumentu} ${plural(n.dokumentu, "dokument", "dokumenty", "dokumentů")}</div></td>
+      <td data-l="Místo">${esc(lokOf(n))}</td>
+      <td data-l="Stav"><span class="pill s-${n.stav}"><span class="dot"></span>${STAV[n.stav]}</span></td>
+      <td data-l="Konec">${dateCell(n)}</td>
+      <td class="r" data-l="Kč/m²">${n.kc_m2.v != null ? nf.format(n.kc_m2.v) + mark(n.kc_m2) : `<span class="muted">–</span>`}</td>
+      <td data-l="Služba"><span class="svc ${n.sluzba}">${SLUZBA[n.sluzba]}</span></td>
+      <td class="chev" aria-hidden="true">▸</td></tr>`).join("");
+    $("rows").querySelectorAll("tr.row").forEach((tr) => {
+      tr.addEventListener("click", () => openDetail(tr.dataset.id, tr));
+      tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(tr.dataset.id, tr); } });
+    });
+  }
+
+  // -------------------------------------------------------------- detail --
+  const byId = Object.fromEntries(N.map((n) => [n.id, n]));
+  let lastFocus = null;
+  const docLink = (p) => (p.doc_pdf ? p.doc_pdf + (p.str ? `#page=${p.str}` : "") : p.doc_odkaz);
+  const DOCNAME = { DODATEK: "dodatek", "UKONČENÍ": "dohoda o ukončení", SMLOUVA: "smlouva" };
+  function srcLine(p) {
+    if (!p.doc) return "";
+    const kde = [p.str ? `str. ${p.str}` : "", p.cl ? `čl. ${p.cl}` : ""].filter(Boolean).join(", ");
+    const link = docLink(p);
+    return `<span>Zdroj: ${DOCNAME[p.doc_stitek] || "dokument"} z ${cz(p.doc_datum)}${kde ? " · " + kde : ""}${link ? ` · <a href="${esc(link)}" target="_blank" rel="noopener">otevřít dokument ↗</a>` : ""}</span>`;
+  }
+  function field(label, p, fmt, empty) {
+    if (p.v == null) return `<div class="f"><span class="k">${label}</span><span class="val none">${empty || "ve smlouvě nenalezeno"}</span></div>`;
+    const badge = p.ok ? `<span class="badge ok" title="Hodnota je doslova v citovaném textu smlouvy">✓ ověřeno</span>` : `<span class="badge warn">⚠ zkontrolovat</span>`;
+    const notes = [];
+    if (p.pozn) notes.push(`<span>${esc(p.pozn)}</span>`);
+    if (p.zdroj === "rozpor" && p.alt != null) notes.push(`<span>Jiné místo ve smlouvě uvádí ${esc(fmt(p.alt))}.</span>`);
+    if (p.puvodni) notes.push(`<span>Původně ${esc(fmt(p.puvodni.v))} (dokument z ${cz(p.puvodni.datum)}).</span>`);
+    const s = srcLine(p); if (s) notes.push(s);
+    if (p.cit) notes.push(`<details><summary>Citace ze smlouvy</summary><blockquote>${esc(p.cit)}</blockquote></details>`);
+    return `<div class="f"><span class="k">${label}</span><span class="val">${esc(fmt(p.v))}${badge}</span>${notes.length ? `<div class="meta">${notes.join("")}</div>` : ""}</div>`;
+  }
+  const fKc = (v) => nf.format(v) + " Kč/m² měsíčně";
+  const fM2 = (v) => nf1.format(v) + " m²";
+  const fMes = (v) => `${v} ${plural(+v, "měsíc", "měsíce", "měsíců")}`;
+  function critBox(n) {
+    if (n.stav === "neurcita") return `<div class="crit"><span>Kritické datum</span><b>Kdykoli</b><span>Nájem na dobu neurčitou${n.lhuta ? `, výpověď s lhůtou ${fMes(n.lhuta)}` : ""}. Nájemce může odejít nebo jednat o nových podmínkách.</span></div>`;
+    if (n.kriticke) {
+      const m = mesicu(n.kriticke);
+      const kdy = m < 0 ? "lhůta už uplynula" : m === 0 ? "tento měsíc" : `za ${m} ${plural(m, "měsíc", "měsíce", "měsíců")}`;
+      const proc = n.lhuta ? `Konec nájmu ${cz(n.konec.v)} minus ${n.lhuta_druh === "opce" ? "lhůta pro uplatnění prodloužení" : "výpovědní lhůta"} ${fMes(n.lhuta)}.` : `Smlouva neuvádí lhůtu před koncem, kritické je datum konce.`;
+      return `<div class="crit ${m < 0 || m > 24 ? "calm" : ""}"><span>Kritické datum</span><b>${cz(n.kriticke)} · ${kdy}</b><span>${proc}${n.konec.ok ? "" : " Konec je třeba ověřit."}</span></div>`;
+    }
+    if (n.stav === "skoncilo") return `<div class="crit calm"><span>Kritické datum</span><b>Nájem skončil ${cz(n.konec.v)}</b><span>Pokud úřad v prostorách zůstal, platí nová smlouva, která v datech zatím není.</span></div>`;
+    return `<div class="crit calm"><span>Kritické datum</span><b>Nelze určit</b><span>Ve smlouvě jsme nenašli konec nájmu ani dobu neurčitou.</span></div>`;
+  }
+  const SV_DUVOD = {
+    relokace: (n) => (n.kriticke && n.kriticke < DNES
+      ? `Lhůta pro výpověď nebo prodloužení už uplynula a nájem končí ${cz(n.konec.v)}. Nájemce teď řeší, kde bude sídlit dál: nové prostory, nebo nová smlouva se stávajícím pronajímatelem.`
+      : "Do kritického data zbývá méně než 24 měsíců. Teď je čas porovnat nabídky na trhu a buď vyjednat lepší podmínky, nebo připravit stěhování."),
+    prejednani: (n) => `Nájem na dobu neurčitou lze vypovědět kdykoli${n.lhuta ? ` s lhůtou ${fMes(n.lhuta)}` : ""}. Nájemce má silnou pozici při jednání o ceně.`,
+    kontrakce: () => "Dodatky ukazují zmenšování pronajatých prostor. Nájemce nejspíš optimalizuje plochu a může ocenit návrh menších, levnějších prostor.",
+    expanze: () => "Dodatky ukazují rozšiřování prostor. Nájemce roste a může potřebovat větší nebo další prostory.",
+    overit: () => "Podle dokumentů nájem skončil, nebo konec nesedí s pozdějšími dodatky. Stojí za to ověřit, kde úřad sídlí dnes.",
+    monitoring: () => "Nájem běží a rozhodnutí není na spadnutí. Stačí sledovat nové dodatky v registru.",
+  };
+  function entityLinks(nazev, ico, role, fo, isTenant) {
+    const l = [];
+    if (ico) {
+      l.push(`<a href="https://ares.gov.cz/ekonomicke-subjekty?ico=${ico}" target="_blank" rel="noopener">ARES ↗</a>`);
+      if (fo) l.push(`<a href="https://www.rzp.cz/verejne-udaje/cs/udaje/vyber-subjektu;ico=${ico};" target="_blank" rel="noopener">Živnostenský rejstřík ↗</a>`);
+      else if (!isTenant) l.push(`<a href="https://or.justice.cz/ias/ui/rejstrik-$firma?ico=${ico}" target="_blank" rel="noopener">Obchodní rejstřík ↗</a>`);
+      l.push(isTenant ? `<a href="https://smlouvy.gov.cz/vyhledavani?subject_idnum=${ico}" target="_blank" rel="noopener">Další smlouvy v registru ↗</a>`
+        : `<a href="https://www.hlidacstatu.cz/subjekt/${ico}" target="_blank" rel="noopener">Smlouvy se státem (Hlídač státu) ↗</a>`);
+    }
+    const filt = isTenant ? `<button type="button" class="linkbtn" data-fn="${esc(ico)}" data-label="${esc(nazev)}">Všechny nájmy nájemce</button>`
+      : `<button type="button" class="linkbtn" data-fp="${esc(ico || nazev)}" data-label="${esc(nazev)}">Všechny nájmy pronajímatele</button>`;
+    return `<div><div class="who2">${role}: ${esc(nazev)}${ico ? ` <span class="muted num" style="font-weight:400">· IČO ${ico}</span>` : ""}</div><div class="row2">${l.join("")}${filt}</div></div>`;
+  }
+  function timeline(n) {
+    const cur = new Set([n.konec.doc, n.plocha.doc, n.kc_m2.doc, n.vypoved.doc].filter(Boolean));
+    return `<ol class="tl">${n.dokumenty.map((d) => {
+      const ch = d.zmeny && d.zmeny.length ? `<ul class="ch">${d.zmeny.map((z) => `<li>${esc(z)}</li>`).join("")}</ul>` : "";
+      const zc = d.zmena_cit ? `<details><summary>Citace</summary><blockquote>${esc(d.zmena_cit)}</blockquote></details>` : "";
+      return `<li class="${cur.has(d.id) ? "cur" : ""}"><span class="node" aria-hidden="true"></span><div class="body">
+        <div class="h"><span class="tag">${d.stitek}</span><b>${cz(d.datum)}</b>${d.cislo ? `<span class="muted">č. ${esc(d.cislo)}</span>` : ""}${d.hodnota != null ? `<span class="muted num">${nf.format(d.hodnota)} Kč</span>` : ""}</div>
+        ${ch}${zc}<div class="row2"><a href="${esc(d.odkaz)}" target="_blank" rel="noopener">Záznam v registru ↗</a>${d.text ? "" : `<span class="muted">text se nepodařilo přečíst</span>`}</div></div></li>`;
+    }).join("")}</ol><p class="hint">Plný kroužek = dokument, ze kterého pochází údaj v části Nájem dnes.${n.chybi_puvodni ? " Původní smlouva v datech není: je starší než registr, nebo nebyla zveřejněna." : ""}</p>`;
+  }
+  function openDetail(id, from) {
+    const n = byId[id]; if (!n) return;
+    if ($("drawer").hidden) lastFocus = from || document.activeElement;
+    st.open = id;
+    const adr = n.adresa ? `<div class="f"><span class="k">Adresa prostor</span><span class="val">${esc(n.adresa)}${n.adresa_zdroj === "predmet" ? `<span class="badge ok">✓ z předmětu smlouvy</span>` : n.adresa_ok ? `<span class="badge ok">✓ ze smlouvy</span>` : `<span class="badge warn">⚠ zkontrolovat</span>`}</span><div class="meta">
+        <span><a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(n.adresa)}" target="_blank" rel="noopener">Zobrazit v Google Maps ↗</a></span>
+        ${n.adresa_misto && n.adresa_misto.str ? `<span>Ve smlouvě na str. ${n.adresa_misto.str}${n.adresa_misto.cl ? ", čl. " + esc(n.adresa_misto.cl) : ""}.</span>` : ""}
+        ${n.adresa_zdroj === "predmet" ? `<span>V textu smlouvy adresa není, ulice je převzatá z předmětu smlouvy v registru.</span>` : n.adresa_ok ? "" : `<span>Adresu navrhl jazykový model nebo nesedí s místem v předmětu smlouvy.</span>`}
+        ${n.adresa_cit ? `<details><summary>Citace ze smlouvy</summary><blockquote>${esc(n.adresa_cit)}</blockquote></details>` : ""}</div></div>`
+      : n.adresa_dotaz ? `<div class="f"><span class="k">Adresa prostor</span><span class="val">${esc(n.adresa_dotaz)}<span class="badge warn">⚠ přibližně</span></span><div class="meta">
+        <span><a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(n.adresa_dotaz)}" target="_blank" rel="noopener">Hledat v Google Maps ↗</a></span>
+        <span>${n.adresa_zdroj === "hledani" ? "Přesná adresa není ve smlouvě ani v registru. Hledáme podle názvu místa z předmětu smlouvy." : "Přesná adresa není ve smlouvě ani v registru. Hledáme pracoviště nájemce v daném městě – nemusí jít přímo o pronajaté prostory."}</span></div></div>`
+      : `<div class="f"><span class="k">Adresa prostor</span><span class="val none">ve smlouvě ani v registru neuvedena${n.lokalita ? ` · místo: ${esc(n.lokalita)}` : ""}</span></div>`;
+    const indexace = n.indexace.v ? { ...n.indexace, v: "ano, podle inflace nebo indexu" } : n.indexace;
+    const opce = n.opce.v != null ? { ...n.opce, v: `ano, uplatnit nejpozději ${fMes(n.opce.v)} před koncem` } : n.opce;
+    const konec = n.stav === "neurcita" ? { v: "doba neurčitá", ok: true } : n.konec;
+    $("drawer").innerHTML = `
+      <div class="dtop"><div class="tags"><span class="pill s-${n.stav}"><span class="dot"></span>${STAV[n.stav]}</span><span class="tag">${n.dokumentu} ${plural(n.dokumentu, "dokument", "dokumenty", "dokumentů")}</span><span class="tag">${esc(lokOf(n))}</span></div>
+        <button type="button" class="close" id="dclose" aria-label="Zavřít detail">✕</button></div>
+      <div style="display:grid;gap:6px"><h2 id="d-title">${esc(n.najemce)}</h2><p class="muted">${esc(n.predmet || "")}</p></div>
+      ${critBox(n)}
+      <div class="box svcbox"><span class="eyebrow">Doporučená služba</span><b>${SLUZBA[n.sluzba]}</b><p>${SV_DUVOD[n.sluzba](n)}</p></div>
+      <div class="box today"><h3>Nájem dnes <span class="eyebrow">platné znění podle posledního dokumentu</span></h3>
+        ${field("Konec nájmu", konec, (v) => (/^\d{4}-/.test(v) ? cz(v) : v))}
+        ${field("Plocha", n.plocha, fM2)}
+        ${field("Nájemné", n.kc_m2, fKc)}
+        ${n.mena === "EUR" && n.kc_m2.v != null ? `<p class="hint">Nájemné je ve smlouvě v eurech, přepočteno kurzem ČNB ${M.kurz_eur} Kč/EUR k ${cz(M.kurz_datum)}.</p>` : ""}
+        ${field("Výpověď (lhůta)", n.vypoved, fMes)}
+        ${field("Možnost prodloužení", opce, (v) => v, "ve smlouvě nenalezena")}
+        ${field("Zvyšování nájemného", indexace, (v) => v)}
+        ${adr}
+      </div>
+      <div class="box"><h3>Dokumenty nájmu</h3>${timeline(n)}</div>
+      <div class="box links"><h3>Strany smlouvy</h3>
+        ${entityLinks(n.najemce, n.najemce_ico, "Nájemce", false, true)}
+        ${n.pronajimatel.map((p) => entityLinks(p.nazev, p.ico, "Pronajímatel", p.fo, false)).join("") || `<p class="muted">Pronajímatel v registru neuveden.</p>`}
+        ${n.pronajimatel.some((p) => p.fo) ? `<p class="hint">Jméno fyzické osoby nezobrazujeme. IČO vede do veřejného rejstříku.</p>` : ""}
+      </div>`;
+    $("drawer").hidden = false; $("shade").hidden = false; $("drawer").scrollTop = 0;
+    document.body.style.overflow = "hidden";
+    $("dclose").focus();
+    $("dclose").addEventListener("click", closeDetail);
+    const jump = (fn) => { resetAll(false); fn(); closeDetail(true); render(); goList(); };
+    $("drawer").querySelectorAll("[data-fn]").forEach((b) => b.addEventListener("click", () => jump(() => (st.najemce = { v: b.dataset.fn, label: b.dataset.label }))));
+    $("drawer").querySelectorAll("[data-fp]").forEach((b) => b.addEventListener("click", () => jump(() => (st.pronajimatel = { v: b.dataset.fp, label: b.dataset.label }))));
+    try { history.replaceState(null, "", "#" + id); } catch (e) { /* bez historie */ }
+    syncSelected();
+  }
+  function syncSelected() { $("rows").querySelectorAll("tr.row").forEach((tr) => tr.setAttribute("aria-selected", String(tr.dataset.id === st.open))); }
+  function closeDetail(noFocus) {
+    if ($("drawer").hidden) return;
+    $("drawer").hidden = true; $("shade").hidden = true; st.open = null; document.body.style.overflow = "";
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* bez historie */ }
+    syncSelected();
+    if (noFocus !== true && lastFocus && document.contains(lastFocus) && lastFocus.focus) lastFocus.focus();
+  }
+  $("shade").addEventListener("click", closeDetail);
+  document.addEventListener("keydown", (e) => {
+    if ($("drawer").hidden) return;
+    if (e.key === "Escape") closeDetail();
+    if (e.key === "Tab") {
+      const f = [...$("drawer").querySelectorAll("a[href], button, summary, textarea")].filter((x) => x.getClientRects().length);
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+
+  // ------------------------------------------------------------ kalendar --
+  function calItems(list) {
+    const [y0, m0] = DNES.split("-").map(Number), q0 = Math.floor((m0 - 1) / 3);
+    const qs = []; for (let i = 0; i < 12; i++) { const k = q0 + i; qs.push({ y: y0 + Math.floor(k / 4), q: (k % 4) + 1, items: [] }); }
+    const keyOf = (iso) => { const [y, m] = iso.split("-").map(Number); return (y - y0) * 4 + Math.floor((m - 1) / 3) - q0; };
+    list.forEach((n) => {
+      if (n.stav === "neurcita" || n.stav === "skoncilo" || n.stav === "nezname") return;
+      const d = n.kriticke || n.konec.v; if (!d) return;
+      let k = keyOf(d), po = false;
+      if (k < 0 && n.konec.v && n.konec.v >= DNES) { k = 0; po = true; }
+      if (k >= 0 && k < 12) qs[k].items.push({ n, d, po });
+    });
+    return qs;
+  }
+  function calendar() {
+    const list = filtered(), qs = calItems(list);
+    $("cal").innerHTML = qs.map((q, i) => `<div class="qcol ${i === 0 ? "now" : ""}"><h3>${q.q}. čtvrtletí ${q.y}<span>${q.items.length || ""}</span></h3>
+      ${q.items.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)).map(({ n, d, po }) => `<button type="button" class="ev s-${n.stav}" data-id="${n.id}"><b>${esc(n.najemce)}</b><span>${esc(lokOf(n))} · ${po ? `lhůta uplynula ${cz(d)}, konec ${cz(n.konec.v)}` : (n.kriticke && n.kriticke !== n.konec.v ? "kritické " : "konec ") + cz(d)}${n.konec.ok ? "" : " · ⚠ ověřit"}</span></button>`).join("")}</div>`).join("");
+    $("cal").querySelectorAll(".ev").forEach((b) => b.addEventListener("click", () => openDetail(b.dataset.id, b)));
+    const total = qs.reduce((a, q) => a + q.items.length, 0), neur = list.filter((n) => n.stav === "neurcita").length;
+    $("calnote").innerHTML = `<span><b class="num" id="caltotal">${total}</b> ${plural(total, "nájem má", "nájmy mají", "nájmů má")} kritické datum v příštích 36 měsících.</span>` +
+      (neur ? `<span>Dalších <b class="num">${neur}</b> ${plural(neur, "nájem je", "nájmy jsou", "nájmů je")} na dobu neurčitou a rozhodnout se mohou kdykoli.</span>` +
+        (st.stav === "neurcita" ? "" : `<button type="button" class="linkbtn" id="calneur">Zobrazit je v seznamu</button>`) : "");
+    if ($("calneur")) $("calneur").addEventListener("click", () => { st.stav = "neurcita"; render(); goList(); });
+  }
+
+  // ----------------------------------------------------------- benchmark --
+  const KRAJSKA = new Set(["Brno", "Ostrava", "Plzeň", "Olomouc", "Liberec", "České Budějovice", "Hradec Králové", "Pardubice", "Ústí nad Labem", "Zlín", "Jihlava", "Karlovy Vary"]);
+  function bench() {
+    const pts = N.filter((n) => n.kc_m2.ok);
+    const groups = [["Praha", (n) => lokOf(n).startsWith("Praha")], ["Krajská města", (n) => KRAJSKA.has(n.lokalita)], ["Ostatní a neuvedeno", () => true]];
+    const used = new Set();
+    const rg = groups.map(([g, f]) => { const l = pts.filter((n) => !used.has(n.id) && f(n)); l.forEach((n) => used.add(n.id)); return [g, l]; }).filter((r) => r[1].length);
+    const W = 760, L = 170, R = 24, RH = 56, T = 14, H = T + rg.length * RH + 34;
+    const max = Math.max(500, Math.ceil(Math.max(...pts.map((n) => n.kc_m2.v)) / 100) * 100);
+    const x = (v) => L + (v / max) * (W - L - R);
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Nájemné za m² měsíčně podle typu lokality">`;
+    for (let v = 0; v <= max; v += 100) s += `<line class="gl" x1="${x(v)}" x2="${x(v)}" y1="${T - 4}" y2="${T + rg.length * RH}"></line><text x="${x(v)}" y="${H - 12}" text-anchor="middle">${nf.format(v)} Kč</text>`;
+    rg.forEach(([g, l], i) => {
+      const cy = T + i * RH + RH / 2, v = l.map((n) => n.kc_m2.v).sort((a, b) => a - b), med = v[Math.floor(v.length / 2)];
+      s += `<text class="lbl" x="0" y="${cy - 4}">${esc(g)}</text><text x="0" y="${cy + 12}">${najmu(l.length)} · medián ${nf.format(med)} Kč</text>`;
+      s += `<line class="med" x1="${x(med)}" x2="${x(med)}" y1="${cy - 18}" y2="${cy + 18}"></line>`;
+      l.forEach((n, j) => { s += `<circle class="pt" tabindex="0" role="button" r="6" cx="${x(n.kc_m2.v).toFixed(1)}" cy="${cy + ((j % 3) - 1) * 8}" data-id="${n.id}" aria-label="${esc(n.najemce)}, ${esc(lokOf(n))}: ${nf.format(n.kc_m2.v)} Kč za m²"></circle>`; });
+    });
+    $("bench").innerHTML = `<div class="benchwrap">${s}</svg></div><p class="hint">Klepnutím na bod otevřete detail nájmu. Eura přepočtena kurzem ČNB ${M.kurz_eur} Kč/EUR k ${cz(M.kurz_datum)}.</p>`;
+    $("cena-p").textContent = `Nájemné bez služeb a DPH v Kč za m² měsíčně. Jen ${pts.length} hodnot ověřených citací ze smlouvy, ze všech nájmů bez ohledu na filtry. Svislá čára je medián.`;
+    const tip = $("tip");
+    $("bench").querySelectorAll(".pt").forEach((c) => {
+      const n = byId[c.dataset.id];
+      const show = () => { tip.innerHTML = `<b>${esc(n.najemce)}</b><br>${esc(lokOf(n))} · ${nf.format(n.kc_m2.v)} Kč/m²${n.plocha.v ? ` · ${nf.format(n.plocha.v)} m²` : ""}`; tip.hidden = false;
+        const r = c.getBoundingClientRect(); tip.style.left = Math.min(window.innerWidth - 290, Math.max(8, r.left - 20)) + "px"; tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + "px"; };
+      const open = () => { tip.hidden = true; openDetail(n.id, c); };
+      c.addEventListener("mouseenter", show); c.addEventListener("focus", show);
+      c.addEventListener("mouseleave", () => (tip.hidden = true)); c.addEventListener("blur", () => (tip.hidden = true));
+      c.addEventListener("click", open); c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+    });
+  }
+
+  // -------------------------------------------------------------- dotazy --
+  const item = (n, txt) => `<li><button type="button" class="linkbtn" data-id="${n.id}">${esc(n.najemce)}</button> <span class="muted">– ${txt}</span></li>`;
+  const QS = [
+    ["Komu se do 24 měsíců rozhoduje o nájmu?", () => {
+      const l = N.filter(kritDo24).sort((a, b) => ((a.kriticke || a.konec.v) < (b.kriticke || b.konec.v) ? -1 : 1));
+      return `<p>${najmu(l.length)}, seřazeno podle kritického data:</p><ol>${l.map((n) => item(n, `${esc(lokOf(n))}, ${n.kriticke ? "kritické datum " + cz(n.kriticke) : "konec " + cz(n.konec.v)}${n.konec.ok ? "" : " (⚠ ověřit)"}`)).join("")}</ol>`;
+    }],
+    ["Kdo platí v Praze nejvíc za m²?", () => {
+      const l = N.filter((n) => n.kc_m2.ok && lokOf(n).startsWith("Praha")).sort((a, b) => b.kc_m2.v - a.kc_m2.v).slice(0, 8);
+      return `<p>Nejvyšší ověřené nájemné v Praze, Kč za m² měsíčně:</p><ol>${l.map((n) => item(n, `${esc(lokOf(n))}, ${nf.format(n.kc_m2.v)} Kč${n.plocha.v ? `, ${nf.format(n.plocha.v)} m²` : ""}`)).join("")}</ol>`;
+    }],
+    ["Kdo může vypovědět nejrychleji?", () => {
+      const l = N.filter((n) => n.stav === "neurcita" && n.vypoved.ok).sort((a, b) => a.vypoved.v - b.vypoved.v || a.najemce.localeCompare(b.najemce, "cs")).slice(0, 10);
+      return `<p>Nájmy na dobu neurčitou s nejkratší ověřenou výpovědní lhůtou:</p><ol>${l.map((n) => item(n, `${esc(lokOf(n))}, výpověď ${fMes(n.vypoved.v)}`)).join("")}</ol>`;
+    }],
+    ["Kteří pronajímatelé mají od státu nejvíc nájmů?", () => {
+      const g = {};
+      N.forEach((n) => n.pronajimatel.filter((p) => !p.fo).forEach((p) => { (g[p.ico || p.nazev] ||= { p, l: [] }).l.push(n); }));
+      const l = Object.values(g).sort((a, b) => b.l.length - a.l.length || a.p.nazev.localeCompare(b.p.nazev, "cs")).slice(0, 8);
+      return `<p>Pronajímatelé podle počtu nájmů ve skeneru:</p><ol>${l.map(({ p, l: x }) => `<li><button type="button" class="linkbtn" data-fp="${esc(p.ico || p.nazev)}" data-label="${esc(p.nazev)}">${esc(p.nazev)}</button> <span class="muted">– ${najmu(x.length)}: ${esc([...new Set(x.map((n) => n.najemce))].slice(0, 3).join(", "))}</span></li>`).join("")}</ol>`;
+    }],
+    ["Kde se prostory zmenšují nebo rozšiřují?", () => {
+      const l = N.filter((n) => n.sluzba === "kontrakce" || n.sluzba === "expanze");
+      return `<p>Nájmy, kde dodatky mění rozsah prostor:</p><ol>${l.map((n) => item(n, `${esc(lokOf(n))}, ${n.sluzba === "kontrakce" ? "zmenšení" : "rozšíření"}`)).join("")}</ol>`;
+    }],
+  ];
+  function asks() {
+    $("qs").innerHTML = QS.map(([q], i) => `<button type="button" class="qbtn" data-q="${i}" aria-pressed="${i === 0}">${esc(q)}</button>`).join("");
+    const show = (i) => {
+      $("qs").querySelectorAll(".qbtn").forEach((b, j) => b.setAttribute("aria-pressed", String(i === j)));
+      $("ans").innerHTML = `<h3>${esc(QS[i][0])}</h3>` + QS[i][1]();
+      $("ans").querySelectorAll("[data-id]").forEach((b) => b.addEventListener("click", () => openDetail(b.dataset.id, b)));
+      $("ans").querySelectorAll("[data-fp]").forEach((b) => b.addEventListener("click", () => { resetAll(false); st.pronajimatel = { v: b.dataset.fp, label: b.dataset.label }; render(); goList(); }));
+    };
+    $("qs").querySelectorAll(".qbtn").forEach((b) => b.addEventListener("click", () => show(+b.dataset.q)));
+    show(0);
+  }
+
+  // -------------------------------------------------------------- metoda --
+  function method() {
+    const o = M.overeni || {};
+    const st5 = [
+      [M.zaznamu, `záznamů v Registru smluv za ${M.mesicu} měsíců`],
+      [M.kandidatu, "smluv o nájmu nebytových prostor"],
+      [M.shortlist, "kancelářských nájmů, kde je nájemcem úřad nebo státní organizace"],
+      [M.metadat, "dokumentů s metadaty, ze kterých se skládá řetězec smlouva → dodatky"],
+      [M.najmu, `nájmů (${M.dokumentu} dokumentů) na této stránce`]];
+    $("flow").innerHTML = st5.map(([v, l]) => `<div class="step"><span class="v">${v != null ? nf.format(v) : "–"}</span><span class="l">${esc(l)}</span></div>`).join("");
+    const pct = (k) => (o[k] ? `${o[k].overeno} ověřeno, ${o[k].zkontrolovat} ke kontrole, ${o[k].chybi} nenalezeno` : "");
+    const notes = [
+      ["Dodatky patří ke smlouvě", "Registr u každého dodatku uvádí, ke které smlouvě patří. Detail proto ukazuje platné znění: hodnotu z nejnovějšího dokumentu a co platilo původně."],
+      ["Dvě nezávislé metody", `Údaje čtou pravidla nad textem smlouvy a lokální jazykový model ${esc(M.model)}. Když se liší, ukážeme obě hodnoty.`],
+      ["✓ ověřeno a ⚠ zkontrolovat", `✓ znamená, že hodnota je doslova v citovaném textu smlouvy. ⚠ znamená, že ji navrhl jen model, nebo jí odporuje jiné místo či pozdější dokument. Konec nájmu: ${pct("konec")}. Nájemné: ${pct("kc_m2")}.`],
+      ["Strana a článek", "U citace je strana dokumentu a nejbližší článek nad ní. Strany se počítají přes všechny přílohy záznamu v pořadí, v jakém jsou v registru."],
+      ["Kritické datum", "Poslední den, kdy nájemce ještě stihne vypovědět nebo uplatnit prodloužení – tehdy se rozhoduje, jestli zůstane, nebo se stěhuje. Počítá se jako konec nájmu minus delší ze dvou lhůt (výpovědní lhůta, nebo lhůta pro uplatnění prodloužení). Příklad: konec 31. 1. 2029 a lhůta 6 měsíců → kritické datum 31. 7. 2028. U doby neurčité může nájemce jednat kdykoli."],
+      ["Ochrana osobních údajů", "U pronajímatelů, kteří jsou fyzické osoby, nezobrazujeme jméno, ani v citacích. IČO zůstává a vede do veřejného rejstříku."],
+      ["Co v datech chybí", "Smlouvy starší než registr (2016), skeny bez textové vrstvy a nájmy, které úřad nezveřejnil. Plocha v dodatku může popisovat jen měněnou část prostor."],
+      ["Kurz a ceny", `Nájemné bez DPH a služeb. Eura přepočtena kurzem ČNB ${M.kurz_eur} Kč/EUR k ${cz(M.kurz_datum)}. Roční, pololetní a čtvrtletní platby jsou převedeny na měsíc.`]];
+    $("notes").innerHTML = notes.map(([h, p]) => `<div><h3>${esc(h)}</h3><p>${p}</p></div>`).join("");
+    $("foot").textContent = `Data k ${cz(DNES)} · zdroje: Registr smluv (smlouvy.gov.cz), ARES`;
+  }
+
+  // ------------------------------------------------------------- export --
+  function tsvRows() {
+    const head = ["Nájemce", "IČO nájemce", "Pronajímatel", "IČO pronajímatele", "Místo", "Adresa prostor", "Stav", "Konec nájmu", "Konec ověřen",
+      "Kritické datum", "Plocha m²", "Kč/m² měsíčně", "Nájemné ověřeno", "Výpověď (měsíce)", "Doporučená služba", "Dokumentů", "Odkaz do registru"];
+    const r = sortList(filtered()).map((n) => [n.najemce, n.najemce_ico, prona(n), n.pronajimatel.map((p) => p.ico || "").join(", "), lokOf(n), n.adresa || "", STAV[n.stav],
+      n.stav === "neurcita" ? "doba neurčitá" : cz(n.konec.v), n.konec.v ? (n.konec.ok ? "ano" : "ne") : "", n.kriticke ? cz(n.kriticke) : (n.kriticke_txt || ""),
+      n.plocha.v != null ? String(n.plocha.v).replace(".", ",") : "", n.kc_m2.v != null ? String(n.kc_m2.v).replace(".", ",") : "", n.kc_m2.v != null ? (n.kc_m2.ok ? "ano" : "ne") : "",
+      n.vypoved.v ?? "", SLUZBA[n.sluzba], n.dokumentu, n.dokumenty[n.dokumenty.length - 1].odkaz]);
+    return [head, ...r];
+  }
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 4000); }
+  $("copy").addEventListener("click", () => {
+    const data = tsvRows(), txt = data.map((r) => r.map((c) => String(c).replace(/[\t\r\n]+/g, " ")).join("\t")).join("\n"), n = data.length - 1;
+    const done = () => toast(`Zkopírováno ${n} ${plural(n, "řádek", "řádky", "řádků")}. Vložte do Excelu (Ctrl+V).`);
+    const fallback = () => {
+      const ta = document.createElement("textarea"); ta.value = txt; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.top = "0"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (e) { ok = false; } ta.remove();
+      if (ok) done(); else showCopyBox(txt);
+    };
+    try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (e) { fallback(); }
+  });
+  function showCopyBox(txt) {
+    lastFocus = $("copy");
+    $("drawer").innerHTML = `<div class="dtop"><h2 id="d-title">Kopírovat do Excelu</h2><button type="button" class="close" id="dclose" aria-label="Zavřít">✕</button></div>
+      <div class="copybox"><p>Prohlížeč nepovolil zápis do schránky. Text je označený: stiskněte Ctrl+C (na Macu ⌘C) a vložte ho do Excelu.</p><label class="vh" for="copyta">Data k vložení</label><textarea id="copyta" readonly></textarea></div>`;
+    $("copyta").value = txt; $("drawer").hidden = false; $("shade").hidden = false; $("copyta").focus(); $("copyta").select();
+    $("dclose").addEventListener("click", closeDetail);
+  }
+  if (location.protocol === "file:") {
+    $("csv").hidden = false;
+    $("csv").addEventListener("click", () => {
+      const csv = "﻿" + tsvRows().map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      a.download = `skener-najmu-${DNES}.csv`; document.body.appendChild(a); a.click(); a.remove();
+    });
+  }
+
+  // -------------------------------------------------------------- render --
+  function render() { activebar(); chips(); carto(); thead(); rows(); calendar(); syncKpis(); }
+  header(); bench(); asks(); method(); render();
+  const h = location.hash.slice(1);
+  if (h && byId[h]) openDetail(h);
+  window.__skener = { st, filtered, N, calItems, render, resetAll };
+})();
+</script>
