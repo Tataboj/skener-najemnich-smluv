@@ -383,7 +383,7 @@ footer { color: var(--muted); font-size: 0.84rem; border-top: 1px solid var(--li
   </section>
 
   <footer>
-    <span>Připravil Michael Klimeš jako ukázku práce.</span>
+    <span>Připravil Michael Klimeš</span>
     <a href="https://github.com/Tataboj/skener-najemnich-smluv" target="_blank" rel="noopener">Zdrojový kód na GitHubu ↗</a>
     <span id="foot"></span>
   </footer>
@@ -404,6 +404,7 @@ const DATA = {"meta":{"verze":"0.6.2","dnes":"2026-10-21","zaznamu":8791641,"kan
   const fold = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const nf = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 0 });
   const nf1 = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 1 });
+  const kurzf = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 3 });
   const cz = (iso) => { if (!iso) return ""; const [y, m, d] = iso.slice(0, 10).split("-"); return `${+d}. ${+m}. ${y}`; };
   const DNES = M.dnes;
   const mesicu = (iso) => { const [y, m, d] = iso.split("-").map(Number); const [a, b, c] = DNES.split("-").map(Number); return (y - a) * 12 + (m - b) - (d < c ? 1 : 0); };
@@ -727,7 +728,7 @@ const DATA = {"meta":{"verze":"0.6.2","dnes":"2026-10-21","zaznamu":8791641,"kan
         ${field("Konec nájmu", konec, (v) => (/^\d{4}-/.test(v) ? cz(v) : v))}
         ${field("Plocha", n.plocha, fM2)}
         ${field("Nájemné", n.kc_m2, fKc)}
-        ${n.mena === "EUR" && n.kc_m2.v != null ? `<p class="hint">Nájemné je ve smlouvě v eurech, přepočteno kurzem ČNB ${M.kurz_eur} Kč/EUR k ${cz(M.kurz_datum)}.</p>` : ""}
+        ${n.mena === "EUR" && n.kc_m2.v != null ? `<p class="hint">Nájemné je ve smlouvě v eurech, přepočteno kurzem ČNB ${kurzf.format(M.kurz_eur)} Kč/EUR k ${cz(M.kurz_datum)}.</p>` : ""}
         ${field("Výpověď (lhůta)", n.vypoved, fMes)}
         ${field("Možnost prodloužení", opce, (v) => v, "ve smlouvě nenalezena")}
         ${field("Zvyšování nájemného", indexace, (v) => v)}
@@ -813,7 +814,7 @@ const DATA = {"meta":{"verze":"0.6.2","dnes":"2026-10-21","zaznamu":8791641,"kan
       s += `<line class="med" x1="${x(med)}" x2="${x(med)}" y1="${cy - 18}" y2="${cy + 18}"></line>`;
       l.forEach((n, j) => { s += `<circle class="pt" tabindex="0" role="button" r="6" cx="${x(n.kc_m2.v).toFixed(1)}" cy="${cy + ((j % 3) - 1) * 8}" data-id="${n.id}" aria-label="${esc(n.najemce)}, ${esc(lokOf(n))}: ${nf.format(n.kc_m2.v)} Kč za m²"></circle>`; });
     });
-    $("bench").innerHTML = `<div class="benchwrap">${s}</svg></div><p class="hint">Klepnutím na bod otevřete detail nájmu. Eura přepočtena kurzem ČNB ${M.kurz_eur} Kč/EUR k ${cz(M.kurz_datum)}.</p>`;
+    $("bench").innerHTML = `<div class="benchwrap">${s}</svg></div><p class="hint">Klepnutím na bod otevřete detail nájmu. Eura přepočtena kurzem ČNB ${kurzf.format(M.kurz_eur)} Kč/EUR k ${cz(M.kurz_datum)}.</p>`;
     $("cena-p").textContent = `Nájemné bez služeb a DPH v Kč za m² měsíčně. Jen ${pts.length} hodnot ověřených citací ze smlouvy, ze všech nájmů bez ohledu na filtry. Svislá čára je medián.`;
     const tip = $("tip");
     $("bench").querySelectorAll(".pt").forEach((c) => {
@@ -884,7 +885,7 @@ const DATA = {"meta":{"verze":"0.6.2","dnes":"2026-10-21","zaznamu":8791641,"kan
       ["Kritické datum", "Poslední den, kdy nájemce ještě stihne vypovědět nebo uplatnit prodloužení – tehdy se rozhoduje, jestli zůstane, nebo se stěhuje. Počítá se jako konec nájmu minus delší ze dvou lhůt (výpovědní lhůta, nebo lhůta pro uplatnění prodloužení). Příklad: konec 31. 1. 2029 a lhůta 6 měsíců → kritické datum 31. 7. 2028. U doby neurčité může nájemce jednat kdykoli."],
       ["Ochrana osobních údajů", "U pronajímatelů, kteří jsou fyzické osoby, nezobrazujeme jméno, ani v citacích. IČO zůstává a vede do veřejného rejstříku."],
       ["Co v datech chybí", "Smlouvy starší než registr (2016), skeny bez textové vrstvy a nájmy, které úřad nezveřejnil. Plocha v dodatku může popisovat jen měněnou část prostor."],
-      ["Kurz a ceny", `Nájemné bez DPH a služeb. Eura přepočtena kurzem ČNB ${M.kurz_eur} Kč/EUR k ${cz(M.kurz_datum)}. Roční, pololetní a čtvrtletní platby jsou převedeny na měsíc.`]];
+      ["Kurz a ceny", `Nájemné bez DPH a služeb. Eura přepočtena kurzem ČNB ${kurzf.format(M.kurz_eur)} Kč/EUR k ${cz(M.kurz_datum)}. Roční, pololetní a čtvrtletní platby jsou převedeny na měsíc.`]];
     $("notes").innerHTML = notes.map(([h, p]) => `<div><h3>${esc(h)}</h3><p>${p}</p></div>`).join("");
     $("foot").textContent = `Data k ${cz(DNES)} · zdroje: Registr smluv (smlouvy.gov.cz), ARES`;
   }
